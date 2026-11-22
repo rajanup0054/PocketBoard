@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pocketboard</title>
+<meta name="theme-color" content="#0f3b3a">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<style>
+:root{--bg:#eef2ef;--surface:#fff;--ink:#12302f;--muted:#5f7775;--line:#d3dfdb;--brand:#0f3b3a;--accent:#e8a317;--danger:#b3372b;--r:14px}
+@media(prefers-color-scheme:dark){:root{--bg:#0b1a19;--surface:#122827;--ink:#e6f0ee;--muted:#8fa9a6;--line:#244240;--brand:#e8a317;--accent:#e8a317;--danger:#ff8a7a}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+main{max-width:680px;margin:0 auto;padding:16px}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:8px 0 16px}
+h1{font-size:1.5rem;margin:0;letter-spacing:-.02em}
+button{font:inherit;cursor:pointer;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:8px 14px}
+button:focus-visible,textarea:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.primary{background:var(--brand);color:#fff;border-color:var(--brand);font-weight:600}
+@media(prefers-color-scheme:dark){.primary{color:#12302f}}
+.room{font-size:.85rem;color:var(--muted)}
+.room b{color:var(--ink)}
+.composer{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px}
+textarea{width:100%;min-height:96px;resize:vertical;border:0;background:transparent;color:inherit;font:inherit}
+.row{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:8px}
+.tabs{display:flex;gap:6px;margin:16px 0 8px}
+.tabs button[aria-pressed=true]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.item{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px;margin-bottom:10px}
+.item p{margin:0 0 8px;white-space:pre-wrap;overflow-wrap:anywhere;max-height:9.5em;overflow:hidden}
+.item.open p{max-height:none}
+.item a{color:inherit;text-decoration-color:var(--accent);text-underline-offset:3px}
+.meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:.8rem;color:var(--muted)}
+.meta .sp{flex:1}
+.meta button{padding:5px 10px;font-size:.85rem}
+.del{color:var(--danger)}
+.empty{text-align:center;color:var(--muted);padding:32px 8px}
+dialog{border:1px solid var(--line);border-radius:var(--r);background:var(--surface);color:var(--ink);max-width:420px;width:calc(100% - 32px)}
+dialog::backdrop{background:rgba(0,0,0,.5)}
+input{width:100%;padding:10px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:inherit;font:inherit;margin:8px 0}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:8px 16px;border-radius:99px;opacity:0;pointer-events:none;transition:opacity .2s}
+.toast.on{opacity:1}
+.err{color:var(--danger);font-size:.9rem}
+.install{display:none;align-items:center;gap:10px;background:var(--brand);color:#fff;border-radius:var(--r);padding:10px 12px;margin-bottom:12px}
+@media(prefers-color-scheme:dark){.install{color:#12302f}}
+.install.on{display:flex}
+.install span{flex:1;font-size:.9rem}
+.install button{background:var(--accent);border-color:var(--accent);color:#12302f;font-weight:600}
+.install .x{background:transparent;border-color:transparent;color:inherit;padding:6px 8px}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div><h1>Pocketboard</h1><div class="room">Room <b id="roomLabel"></b></div></div>
+    <button id="roomBtn">Room</button>
+  </header>
+
+  <div id="install" class="install" role="region" aria-label="Install app">
+    <span id="installMsg">Install Pocketboard to open it from your app drawer.</span>
+    <button id="installBtn">Install</button>
+    <button id="installX" class="x" aria-label="Dismiss">✕</button>
+  </div>
+
+  <section class="composer">
+    <textarea id="text" placeholder="Paste a link, note or job description" aria-label="New clip"></textarea>
+    <div class="row">
+      <button id="pasteBtn">Paste</button>
+      <button id="saveBtn" class="primary">Save clip</button>
+    </div>
+  </section>
+  <p id="err" class="err" role="alert"></p>
+
+  <div class="tabs" role="group" aria-label="Filter">
+    <button data-f="all" aria-pressed="true">All</button>
+    <button data-f="link" aria-pressed="false">Links</button>
+    <button data-f="text" aria-pressed="false">Text</button>
+  </div>
+  <div id="list"></div>
+</main>
+
+<dialog id="dlg">
+  <form method="dialog">
+    <strong>Room code</strong>
+    <p class="room">Every device that uses the same code sees the same clips. Use a long, hard-to-guess code.</p>
+    <input id="roomInput" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Room code">
+    <div class="row">
+      <button value="cancel">Cancel</button>
+      <button id="roomSave" class="primary" value="ok">Use this room</button>
+    </div>
+  </form>
+</dialog>
+<div id="toast" class="toast" role="status"></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getFirestore, collection, addDoc, deleteDoc, doc, query, orderBy, limit, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+// 1) Paste your Firebase web config here (Project settings > Your apps > Web)
+const firebaseConfig = {
+  apiKey: "AIzaSyDX0WGD5wyms6SqftiaWCnqqzO7Ir2Nh1I",
+  authDomain: "pocketboard-13f8f.firebaseapp.com",
+  projectId: "pocketboard-13f8f",
+  appId: "1:117578127955:web:e59b77a80130c26e5b84a6"
+};
+
+const $ = id => document.getElementById(id);
+const db = getFirestore(initializeApp(firebaseConfig));
+let room = localStorage.getItem("room");
+if (!room) { room = crypto.randomUUID().replace(/-/g, "").slice(0, 12); localStorage.setItem("room", room); }
+let filter = "all", items = [], unsub = null;
+
+const isLink = t => /^https?:\/\/\S+$/i.test(t.trim());
+const esc = s => s.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+function toast(m) { const t = $("toast"); t.textContent = m; t.classList.add("on"); setTimeout(() => t.classList.remove("on"), 1600); }
+function ago(ts) {
+  if (!ts) return "just now";
+  const s = (Date.now() - ts.toMillis()) / 1000;
+  if (s < 60) return "just now";
+  if (s < 3600) return Math.floor(s / 60) + " min ago";
+  if (s < 86400) return Math.floor(s / 3600) + " h ago";
+  return ts.toDate().toLocaleDateString();
+}
+
+function listen() {
+  unsub && unsub();
+  $("roomLabel").textContent = room;
+  const q = query(collection(db, "rooms", room, "items"), orderBy("ts", "desc"), limit(100));
+  unsub = onSnapshot(q, snap => {
+    items = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    $("err").textContent = "";
+    render();
+  }, e => { $("err").textContent = "Can't reach Firebase: " + e.message; });
+}
+
+function render() {
+  const rows = items.filter(i => filter === "all" || i.kind === filter);
+  if (!rows.length) { $("list").innerHTML = '<div class="empty">Nothing here yet. Save a clip above and it shows up on every device in this room.</div>'; return; }
+  $("list").innerHTML = rows.map(i => {
+    const body = i.kind === "link" ? `<a href="${esc(i.text)}" target="_blank" rel="noopener noreferrer">${esc(i.text)}</a>` : esc(i.text);
+    const long = i.text.length > 280 || i.text.split("\n").length > 7;
+    return `<article class="item" data-id="${i.id}"><p>${body}</p><div class="meta"><span>${ago(i.ts)}</span><span class="sp"></span>
+      ${long ? '<button data-a="more">Expand</button>' : ""}<button data-a="copy">Copy</button>
+      ${navigator.share ? '<button data-a="share">Share</button>' : ""}<button data-a="del" class="del">Delete</button></div></article>`;
+  }).join("");
+}
+
+async function save(text) {
+  text = text.trim();
+  if (!text) return;
+  try {
+    await addDoc(collection(db, "rooms", room, "items"), { text, kind: isLink(text) ? "link" : "text", ts: serverTimestamp() });
+    toast("Saved");
+  } catch (e) { $("err").textContent = "Couldn't save: " + e.message; }
+}
+
+$("saveBtn").onclick = async () => { await save($("text").value); $("text").value = ""; };
+$("pasteBtn").onclick = async () => {
+  try { $("text").value = await navigator.clipboard.readText(); } catch { toast("Allow clipboard access, or paste manually"); }
+};
+document.querySelector(".tabs").onclick = e => {
+  const b = e.target.closest("button"); if (!b) return;
+  filter = b.dataset.f;
+  document.querySelectorAll(".tabs button").forEach(x => x.setAttribute("aria-pressed", x === b));
+  render();
+};
+$("list").onclick = async e => {
+  const b = e.target.closest("button"); if (!b) return;
+  const card = b.closest(".item"), it = items.find(x => x.id === card.dataset.id);
+  if (b.dataset.a === "copy") { try { await navigator.clipboard.writeText(it.text); toast("Copied"); } catch { toast("Copy blocked by browser"); } }
+  if (b.dataset.a === "share") navigator.share(it.kind === "link" ? { url: it.text } : { text: it.text }).catch(() => {});
+  if (b.dataset.a === "more") { card.classList.toggle("open"); b.textContent = card.classList.contains("open") ? "Collapse" : "Expand"; }
+  if (b.dataset.a === "del") { await deleteDoc(doc(db, "rooms", room, "items", it.id)); toast("Deleted"); }
+};
+$("roomBtn").onclick = () => { $("roomInput").value = room; $("dlg").showModal(); };
+$("dlg").onclose = () => {
+  const v = $("roomInput").value.trim().replace(/\s+/g, "-");
+  if ($("dlg").returnValue === "ok" && v && v !== room) { room = v; localStorage.setItem("room", room); listen(); }
+};
+
+// Phone share sheet -> app (Android, after installing)
+const p = new URLSearchParams(location.search);
+const shared = [p.get("title"), p.get("text"), p.get("url")].filter(Boolean).join("\n");
+if (shared) { $("text").value = shared; history.replaceState(null, "", location.pathname); }
+
+// Install prompt
+let deferred = null;
+const standalone = matchMedia("(display-mode: standalone)").matches || navigator.standalone;
+const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
+const hideInstall = () => { $("install").classList.remove("on"); localStorage.setItem("installDismissed", Date.now()); };
+const dismissed = Date.now() - (+localStorage.getItem("installDismissed") || 0) < 7 * 864e5;
+window.addEventListener("beforeinstallprompt", e => {
+  e.preventDefault(); deferred = e;
+  if (!standalone && !dismissed) $("install").classList.add("on");
+});
+window.addEventListener("appinstalled", () => { $("install").classList.remove("on"); toast("Installed"); });
+$("installBtn").onclick = async () => {
+  if (deferred) { deferred.prompt(); await deferred.userChoice; deferred = null; $("install").classList.remove("on"); }
+  else hideInstall();
+};
+$("installX").onclick = hideInstall;
+if (ios && !standalone && !dismissed) {
+  $("installMsg").textContent = "To install: tap Share, then Add to Home Screen.";
+  $("installBtn").style.display = "none";
+  $("install").classList.add("on");
+}
+
+listen();
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
+</script>
+</body>
+</html>
